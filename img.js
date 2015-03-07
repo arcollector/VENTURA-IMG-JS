@@ -67,7 +67,7 @@ const PIXEL_HEIGHT_SIZE_MICRONS = 10;
 const PIXEL_WIDTH = 12;
 const PIXEL_HEIGHT = 14;
 
-var decodeHeader = function( arrayBuffer, header ) {
+var decodeHeader = function( arrayBuffer, formattedHeader ) {
 	if( arrayBuffer.length < 18 ) {
 		console.error( 'not a IMG file' );
 		return false;
@@ -78,47 +78,47 @@ var decodeHeader = function( arrayBuffer, header ) {
 		return false;
 	}
 	
-	header.wordsCount = arrayBuffer[HEADER_SIZE_IN_WORDS];
-	header.bytesCount = header.wordsCount << 1;
-	console.log( 'header size in words is', header.wordsCount, 'and in bytes is', header.bytesCount );
+	formattedHeader.wordsCount = arrayBuffer[HEADER_SIZE_IN_WORDS];
+	formattedHeader.bytesCount = formattedHeader.wordsCount * 2;
+	console.log( 'header size in words is', formattedHeader.wordsCount, 'and in bytes is', formattedHeader.bytesCount );
 	
-	header.imagePlanes = big2Little( arrayBuffer, IMAGE_PLANES );
-	console.log( 'image color depth is', header.imagePlanes );
-	if( header.imagePlanes !== 1 ) { // check for monochrome-ness
+	formattedHeader.imagePlanes = big2Little( arrayBuffer, IMAGE_PLANES );
+	console.log( 'image color depth is', formattedHeader.imagePlanes );
+	if( formattedHeader.imagePlanes !== 1 ) { // check for monochrome-ness
 		console.error( 'img file is not monochrome' );
 		return false;
 	}
 
-	header.patternLength = big2Little( arrayBuffer, PATTERN_LENGTH );
-	console.log( 'pattern length is', header.patternLength );
+	formattedHeader.patternLength = big2Little( arrayBuffer, PATTERN_LENGTH );
+	console.log( 'pattern length is', formattedHeader.patternLength );
 	
-	header.micronsWidth = big2Little( arrayBuffer, PIXEL_WIDTH_SIZE_MICRONS );
-	header.micronsHeight = big2Little( arrayBuffer, PIXEL_HEIGHT_SIZE_MICRONS );
-	console.log( 'pixel size in microns for width and for height respectively', header.micronsWidth, header.micronsHeight );
+	formattedHeader.micronsWidth = big2Little( arrayBuffer, PIXEL_WIDTH_SIZE_MICRONS );
+	formattedHeader.micronsHeight = big2Little( arrayBuffer, PIXEL_HEIGHT_SIZE_MICRONS );
+	console.log( 'pixel size in microns for width and for height respectively', formattedHeader.micronsWidth, formattedHeader.micronsHeight );
 	
-	header.pixelWidth = big2Little( arrayBuffer, PIXEL_WIDTH );
-	header.pixelHeight = big2Little( arrayBuffer, PIXEL_HEIGHT );
-	console.log( 'img file dimensions (in pixels) are (width*height)', header.pixelWidth, header.pixelHeight );
-	header.widthInBytes = pixels2Bytes( header.pixelWidth );
-	console.log( 'width in bytes is', header.widthInBytes );
+	formattedHeader.pixelWidth = big2Little( arrayBuffer, PIXEL_WIDTH );
+	formattedHeader.pixelHeight = big2Little( arrayBuffer, PIXEL_HEIGHT );
+	console.log( 'img file dimensions (in pixels) are (width*height)', formattedHeader.pixelWidth, formattedHeader.pixelHeight );
+	formattedHeader.widthInBytes = pixels2Bytes( formattedHeader.pixelWidth );
+	console.log( 'width in bytes is', formattedHeader.widthInBytes );
 	
 	return true;
 };
 
-var decodeImage = function( arrayBuffer, header ) {
+var decodeImage = function( arrayBuffer, formattedHeader ) {
 	
-	var arrayBufferIndex = header.bytesCount;
+	var arrayBufferIndex = formattedHeader.bytesCount;
 	
-	var bitmap = new Uint8Array( header.widthInBytes*header.pixelHeight );
+	var bitmap = new Uint8Array( formattedHeader.widthInBytes*formattedHeader.pixelHeight );
 	var bitmapIndex = 0;
 
-	var scanLine = new Uint8Array( header.widthInBytes );
+	var scanLine = new Uint8Array( formattedHeader.widthInBytes );
 
-	for( var i = 0; i < header.pixelHeight; ) {
+	for( var i = 0; i < formattedHeader.pixelHeight; ) {
 		var repCount = 1;
 		// loop 'tl the line's all decoded
 		if( DEBUG ) { var lineOriginal = []; }
-		for( var scanLineIndex = 0; scanLineIndex < header.widthInBytes; ) {
+		for( var scanLineIndex = 0; scanLineIndex < formattedHeader.widthInBytes; ) {
 			var ch = arrayBuffer[arrayBufferIndex++];
 			if( ch === 0 ) {
 				// it's a repetition count or a pattern
@@ -132,13 +132,13 @@ var decodeImage = function( arrayBuffer, header ) {
 				} else {
 					DEBUG && lineOriginal.push( 0 ) && lineOriginal.push( ch );
 					var k = scanLineIndex;
-					var j = header.patternLength;
+					var j = formattedHeader.patternLength;
 					while( j-- ) { // obtain the pattern
 						DEBUG && lineOriginal.push( arrayBuffer[arrayBufferIndex] );
 						scanLine[scanLineIndex++] = ~arrayBuffer[arrayBufferIndex++];
 					}
 					// repeat the pattern by count - 1, because above
-					for( var count = ch - 1, offset = 0; count; count--, offset = offset === header.patternLength ? 0 : offset + 1 ) {
+					for( var count = ch - 1, offset = 0; count; count--, offset = offset === formattedHeader.patternLength ? 0 : offset + 1 ) {
 						scanLine[scanLineIndex++] = scanLine[k+offset];
 					}
 				}
@@ -168,13 +168,13 @@ var decodeImage = function( arrayBuffer, header ) {
 		}
 		DEBUG && console.log( i, lineOriginal );
 		while( repCount-- ) {
-			for( var j = 0; j < header.widthInBytes; j++ ) {
+			for( var j = 0; j < formattedHeader.widthInBytes; j++ ) {
 				bitmap[bitmapIndex++] = scanLine[j];
 			}
 			i++;
 		}
 	}
-	console.log( 'compressed image is', arrayBufferIndex-header.bytesCount, 'bytes long' );
+	console.log( 'compressed image is', arrayBufferIndex-formattedHeader.bytesCount, 'bytes long' );
 	
 	return bitmap;
 };
