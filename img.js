@@ -11,7 +11,7 @@ var loadFile = function( filenameURL, callback ) {
 		if( data ) {
 			callback( new Uint8Array( data ) );
 		} else {
-			console.error( 'corrupted fail' );
+			console.error( 'corrupted data' );
 		}
 	};
 	xhr.onerror = function( e ) {
@@ -28,6 +28,13 @@ var big2Little = function( arrayBuffer, index ) {
 	return (arrayBuffer[index]<<8) | arrayBuffer[index+1];
 };
 
+var createFile = function( header, compress ) {
+	var arrayBuffer = new Uint8Array( header.length + compress.length );
+	arrayBuffer.set( header, 0 );
+	arrayBuffer.set( compress, header.length );
+	return arrayBuffer;
+};
+
 var downloadFile = function( arrayBuffer, filename ) {
 	filename = filename.toString();
 	// create the download link
@@ -39,6 +46,8 @@ var downloadFile = function( arrayBuffer, filename ) {
 	document.body.appendChild( a );
 	// show download window
 	a.click();
+	// clean
+	a.parentNode.removeChild( a );
 };
 
 /////////////////////////////
@@ -178,8 +187,7 @@ var displayBitmap = function( bitmap, width, height ) {
 	var image = context.createImageData( width, height );
 	var widthInBytes = pixels2Bytes( width );
 	var lastPixelCount = 8 - (widthInBytes*8 - width);
-	var widthInBytesMinus1 = widthInBytes - 1;
-	for( var i = 0, j = 0, curwidthInBytes = 0; i < bitmap.length; i++ ) {
+	for( var i = 0, j = 0, curByteInWidth = 0; i < bitmap.length; i++ ) {
 		var colorsBit = bitmap[i];
 		var colors = [
 			(colorsBit & 0x80) >> 7, 
@@ -191,8 +199,8 @@ var displayBitmap = function( bitmap, width, height ) {
 			(colorsBit & 0x02) >> 1, 
 			colorsBit & 0x01 
 		];
-		var pixelsCount = curwidthInBytes === widthInBytesMinus1 ? lastPixelCount : 8; // am i in last byte ??
-		curwidthInBytes = curwidthInBytes ===  widthInBytesMinus1 ? 0 : curwidthInBytes + 1; // increment wisely
+		var pixelsCount = curByteInWidth === (widthInBytes-1) ? lastPixelCount : 8; // am i in last byte ??
+		curByteInWidth =  pixelsCount !== 8 ? 0 : curByteInWidth + 1; // increment wisely
 		for( var k = 0; k < pixelsCount; k++ ) {
 			var color = colors[k]*255;
 			image.data[j++] = color;
@@ -205,7 +213,7 @@ var displayBitmap = function( bitmap, width, height ) {
 };
 
 /////////////////////////////
-// ENCONDING
+// ENCODING
 /////////////////////////////
 
 var createHeader = function( width, height ) {
@@ -318,20 +326,13 @@ var encodeImage = function( bitmap, info ) {
 	return compress.subarray( 0, compressIndex );
 };
 
-var createFile = function( header, compress ) {
-	var arrayBuffer = new Uint8Array( header.length + compress.length );
-	arrayBuffer.set( header, 0 );
-	arrayBuffer.set( compress, header.length );
-	return arrayBuffer;
-};
-
 /////////////////////////////
 // TEST
 /////////////////////////////
 //DEBUG = true;
-var filenameURL = 'OE_Z.IMG';
 var filenameURL = 'BUSINESS.IMG';
-var filenameURL = 'FC1.HTML';
+var filenameURL = 'OE_Z.IMG';
+var filenameURL = 'FC58.IMG';
 loadFile( filenameURL, function( arrayBuffer ) {
 	console.log( 'file size is', arrayBuffer.length, 'bytes long' );
 	var formattedHeader = {};
@@ -342,10 +343,10 @@ loadFile( filenameURL, function( arrayBuffer ) {
 	var bitmap = decodeImage( arrayBuffer, formattedHeader );
 	displayBitmap( bitmap, formattedHeader.pixelWidth, formattedHeader.pixelHeight );
 	
-	var compress = encodeImage( bitmap, { widthInBytes: formattedHeader.widthInBytes, pixelHeight: formattedHeader.pixelHeight } );
+	/*var compress = encodeImage( bitmap, { widthInBytes: formattedHeader.widthInBytes, pixelHeight: formattedHeader.pixelHeight } );
 	var header = createHeader( formattedHeader.pixelWidth, formattedHeader.pixelHeight );
-	var file = createFile( header, compress );
-	downloadFile( file, +new Date() );
+	var file = createFile( header, compress );*/
+	//downloadFile( file, +new Date() );
 	/*var formattedHeader = {};
 	decodeHeader( arrayBuffer, formattedHeader );
 	var bitmap2 = decodeImage( file, formattedHeader );
